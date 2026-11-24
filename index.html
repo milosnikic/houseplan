@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houseplan</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232f4f47'/%3E%3Cpath d='M8 8h16v16H8zM8 17h7M19 17h5M15 8v5' fill='none' stroke='%23fff' stroke-width='2.2'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="toolbar">
+      <h1 class="brand">Houseplan</h1>
+
+      <div class="tool-group">
+        <button class="btn primary" id="btn-open" type="button">Open floor plan</button>
+        <button class="btn" id="btn-scale" type="button" aria-pressed="false" title="Click two points on the plan and type the real distance">Set scale</button>
+        <span class="readout" id="scale-readout"></span>
+      </div>
+
+      <div class="tool-group">
+        <button class="btn" id="btn-undo" type="button" title="Undo (Ctrl/Cmd+Z)">Undo</button>
+        <button class="btn" id="btn-redo" type="button" title="Redo (Ctrl/Cmd+Shift+Z)">Redo</button>
+      </div>
+
+      <div class="tool-group">
+        <label class="check" title="Hold Alt while dragging to switch snapping off for a moment"><input type="checkbox" id="chk-snap"> Snap to 5 cm</label>
+        <label class="check" title="Show the gap from the selected item to its nearest neighbour"><input type="checkbox" id="chk-distance"> Distances</label>
+        <label class="check" title="Show and check the free space needed in front of wardrobes, kitchen units and toilets"><input type="checkbox" id="chk-clearance"> Clearances</label>
+        <label class="check" title="Show sockets, switches, lights and network points"><input type="checkbox" id="chk-electrical"> Electrical</label>
+      </div>
+
+      <div class="tool-group">
+        <button class="btn square" id="btn-zoom-out" type="button" aria-label="Zoom out" title="Zoom out">&minus;</button>
+        <button class="btn" id="btn-fit" type="button" title="Fit the plan to the screen (F)">Fit</button>
+        <button class="btn square" id="btn-zoom-in" type="button" aria-label="Zoom in" title="Zoom in">+</button>
+        <span class="readout" id="zoom-readout"></span>
+      </div>
+
+      <div class="tool-group end">
+        <button class="btn" id="btn-export-png" type="button" title="Save the plan and furniture as one image">Export PNG</button>
+        <button class="btn" id="btn-export-json" type="button" title="Save the layout and the plan image to a file">Export JSON</button>
+        <button class="btn" id="btn-import-json" type="button" title="Open a layout file saved with Export JSON">Import JSON</button>
+        <button class="btn" id="btn-new" type="button" title="Remove the plan image and all furniture">New plan</button>
+      </div>
+
+      <input type="file" id="file-image" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+      <input type="file" id="file-json" accept="application/json,.json" hidden>
+    </header>
+
+    <aside class="panel library" aria-label="Furniture library">
+      <div id="library-list"></div>
+      <form class="custom" id="custom-form">
+        <h2>Custom item</h2>
+        <label class="field">Name
+          <input id="custom-name" type="text" maxlength="60" value="Custom item" required>
+        </label>
+        <div class="pair">
+          <label class="field">Width, cm
+            <input id="custom-w" type="number" min="5" max="3000" step="any" value="100" required>
+          </label>
+          <label class="field">Depth, cm
+            <input id="custom-d" type="number" min="5" max="3000" step="any" value="50" required>
+          </label>
+        </div>
+        <label class="field inline">Color
+          <input id="custom-color" type="color" value="#c7d8c2">
+        </label>
+        <button class="btn wide" type="submit">Add custom item</button>
+      </form>
+    </aside>
+
+    <main class="stage" id="stage">
+      <canvas id="canvas" tabindex="0" aria-label="Floor plan canvas"></canvas>
+      <div class="empty" id="empty-state">
+        <div class="empty-card">
+          <p class="empty-title">Drop a floor plan image here</p>
+          <p>PNG or JPG, a sketch or a scan. It stays on this computer.</p>
+          <button class="btn primary" id="btn-open-empty" type="button">Open floor plan</button>
+        </div>
+      </div>
+      <div class="banner" id="banner" hidden>
+        <span id="banner-text"></span>
+        <button class="btn small" id="banner-action" type="button"></button>
+      </div>
+      <div class="toast" id="toast" role="status" hidden></div>
+    </main>
+
+    <aside class="panel inspector" aria-label="Properties">
+      <section id="insp-none">
+        <h2>Nothing selected</h2>
+        <p class="muted">Add furniture from the library, then click it on the plan to move, turn and resize it.</p>
+      </section>
+
+      <section id="insp-selection" hidden>
+        <h2 id="insp-title"></h2>
+        <p class="flag" id="insp-flag" hidden></p>
+
+        <div id="insp-fields">
+          <label class="field">Label
+            <input id="f-label" type="text" maxlength="60">
+          </label>
+          <div class="pair">
+            <label class="field" title="Center of the item, measured from the left edge of the plan image">X, cm
+              <input id="f-x" type="number" step="any">
+            </label>
+            <label class="field" title="Center of the item, measured from the top edge of the plan image">Y, cm
+              <input id="f-y" type="number" step="any">
+            </label>
+          </div>
+          <div class="pair">
+            <label class="field">Width, cm
+              <input id="f-w" type="number" min="5" step="any">
+            </label>
+            <label class="field">Depth, cm
+              <input id="f-d" type="number" min="5" step="any">
+            </label>
+          </div>
+          <label class="field">Rotation, degrees
+            <input id="f-rot" type="number" step="any">
+          </label>
+          <div class="field inline">
+            <label for="f-color">Color</label>
+            <input id="f-color" type="color">
+            <button class="btn small" id="btn-color-reset" type="button">Default</button>
+          </div>
+        </div>
+
+        <label class="check"><input type="checkbox" id="f-locked"> Locked in place</label>
+
+        <div class="actions">
+          <button class="btn" id="btn-rotate" type="button" title="Turn 90 degrees (R)">Turn 90°</button>
+          <button class="btn" id="btn-flip" type="button" title="Mirror a door swing or an L-shaped sofa">Flip</button>
+          <button class="btn" id="btn-front" type="button" title="Bring to front (])">To front</button>
+          <button class="btn" id="btn-back" type="button" title="Send to back ([)">To back</button>
+          <button class="btn" id="btn-duplicate" type="button" title="Duplicate (Ctrl/Cmd+D)">Duplicate</button>
+          <button class="btn danger" id="btn-delete" type="button" title="Delete (Del)">Delete</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Plan</h2>
+        <dl class="facts">
+          <dt>Image</dt><dd id="plan-image"></dd>
+          <dt>Size</dt><dd id="plan-size"></dd>
+          <dt>Scale</dt><dd id="plan-scale"></dd>
+          <dt>Items</dt><dd id="plan-items"></dd>
+        </dl>
+      </section>
+
+      <section>
+        <h2>Keys</h2>
+        <dl class="keys">
+          <dt>Wheel, pinch</dt><dd>Zoom</dd>
+          <dt>Space + drag</dt><dd>Pan</dd>
+          <dt>Shift + click</dt><dd>Select several</dd>
+          <dt>Arrows</dt><dd>Move 1 cm, with Shift 10 cm</dd>
+          <dt>Alt</dt><dd>No snapping while held</dd>
+          <dt>Shift on rotate</dt><dd>Free angle</dd>
+          <dt>Ctrl/Cmd + D</dt><dd>Duplicate</dd>
+          <dt>Ctrl/Cmd + C, V</dt><dd>Copy, paste</dd>
+          <dt>Ctrl/Cmd + Z</dt><dd>Undo, with Shift redo</dd>
+          <dt>Del</dt><dd>Delete</dd>
+        </dl>
+      </section>
+    </aside>
+
+    <footer class="status">
+      <span id="status-pos"></span>
+      <span id="status-save"></span>
+    </footer>
+  </div>
+
+  <dialog id="dialog">
+    <form id="dialog-form" method="dialog" novalidate>
+      <h2 id="dialog-title"></h2>
+      <p id="dialog-text"></p>
+      <label class="field" id="dialog-field" hidden>
+        <span id="dialog-label"></span>
+        <input id="dialog-input" type="number" min="0" step="any" inputmode="decimal">
+      </label>
+      <p class="flag" id="dialog-error" hidden></p>
+      <div class="dialog-actions">
+        <button class="btn" id="dialog-cancel" type="button">Cancel</button>
+        <button class="btn primary" id="dialog-ok" type="submit">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Classic scripts on purpose: ES module imports do not load from file:// in Chrome. -->
+  <script src="src/geometry.js"></script>
+  <script src="src/catalog.js"></script>
+  <script src="src/model.js"></script>
+  <script src="src/history.js"></script>
+  <script src="src/icons.js"></script>
+  <script src="src/render.js"></script>
+  <script src="src/storage.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>

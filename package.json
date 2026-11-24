@@ -1,0 +1,14 @@
+{
+  "name": "houseplan",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Plan apartment furniture on top of a floor plan image. Runs in the browser, no backend.",
+  "scripts": {
+    "start": "node tools/serve.js",
+    "test": "node --test",
+    "test:browser": "node e2e/slice.js file && node e2e/slice.js http && node e2e/features.js file && node e2e/features.js http && node e2e/extras.js"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.17.0"
+  }
+}
